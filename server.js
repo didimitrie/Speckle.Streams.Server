@@ -14,6 +14,9 @@ var passport        = require('passport')
 var path            = require('path')
 global.APPROOT      = path.resolve(__dirname)
 
+//LOGGING
+var winston         = require('winston');
+
 // HOUSEKEEPING
 var app = express()
 app.use( cors() )
@@ -48,6 +51,8 @@ app.get('/', function (req, res) {
 })
 
 server.listen( 3001, function () {
-  console.log( chalk.blue.inverse('>>> http on    3001') )
-  console.log( chalk.cyan.inverse('>>> sockets on 3001') )
+  winston.log('info',chalk.blue.inverse('>>> http on    3001'));
+  winston.log('info',chalk.cyan.inverse('>>> sockets on 3001'));
+  //console.log( chalk.blue.inverse('>>> http on    3001') )
+  //console.log( chalk.cyan.inverse('>>> sockets on 3001') )
 })

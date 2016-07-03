@@ -3,8 +3,16 @@ var User              = require('../models/user')
 var SpkStream         = require('../models/stream')
 var chalk             = require('chalk')
 var shortId           = require('shortid')
+//LOGGING
+var winston         = require('winston');
 
 module.exports = function ( io ) {
+  
+  //LOGGING
+  if(process.env.NODE_ENV = 'development') { 
+    winston.level = 'debug';
+    winston.log('debug', '>>> Logging with debug!');
+  }
 
   // TODO: socket namespace streams
   // var streams = io.of('/streams')
@@ -15,7 +23,8 @@ module.exports = function ( io ) {
   var names = ["Waterway", "Stream", "Brook", "Torrent", "Current", "Cascade", "Surge", "River", "Deluge", "Canal"]
 
   io.on('connection', function (socket) {
-    console.log( chalk.magenta.inverse('>>> connected clients: ' + ++clientCount ) )
+    winston.log('info', chalk.magenta.inverse('>>> connected clients: ' + ++clientCount ))
+    //console.log( chalk.magenta.inverse('>>> connected clients: ' + ++clientCount ) )
 
     //
     // stream emitter calls
@@ -23,8 +32,12 @@ module.exports = function ( io ) {
 
     socket.on('create-stream', function (data) {
       // emitter instantiated    
-      if( !socket.authenticated ) return;
-      console.log(chalk.magenta.inverse('create-stream'))
+      if( !socket.authenticated ) {
+        winston.log('debug', chalk.magenta.inverse('create-stream: not authenticated'))
+        return;
+      }
+      winston.log('info', chalk.magenta.inverse('create-stream'))
+      //console.log(chalk.magenta.inverse('create-stream'))
       var myStream = new SpkStream( {
         ownerid : socket.userid,
         streamid : shortId.generate(),
@@ -32,15 +45,21 @@ module.exports = function ( io ) {
       })
       
       myStream.save( function (err) {
-        if( err ) return socket.emit('create-stream-result', {success: false, streamid: 'lol'})  
+        if( err ) { 
+          winston.log('debug', 'create-stream: stream creation error')
+          return socket.emit('create-stream-result', {success: false, streamid: 'lol'})
+        } 
+        winston.log('debug', 'create-stream: ' + {success: true, streamid: myStream.streamid})
         socket.emit('create-stream-result', {success: true, streamid: myStream.streamid })  
       }) 
     })
 
     socket.on('update-structure', function (data) {
       // emitter updates inputs
-      console.log(chalk.magenta.inverse('update-structure'))
-      console.log(data)
+      winston.log('info', chalk.magenta.inverse('update-structure'))
+      winston.log('info', data)
+      //console.log(chalk.magenta.inverse('update-structure'))
+      //console.log(data)
       SpkStream.findOne( {streamid: socket.room }, function(err, doc) {
         doc.structure = data.structure;
         doc.save()
@@ -51,8 +70,10 @@ module.exports = function ( io ) {
 
     socket.on('update-name', function (data) {
       // emitter updates name
-      console.log(chalk.magenta.inverse('update-name'))
-      // console.log(data)
+      winston.log('info', chalk.magenta.inverse('update-name'))
+      winston.log('info', data)
+      //console.log(chalk.magenta.inverse('update-name'))
+      //console.log(data)
       SpkStream.findOne( {streamid: socket.room }, function(err, doc) {
         doc.name = data;
         doc.save()
@@ -61,14 +82,21 @@ module.exports = function ( io ) {
 
     socket.on('update-stream', function (data) {
       // emitter sends new data; 
-      console.log(chalk.magenta.inverse('update-stream') + ' id: ' + socket.room)
-      // console.log(data)
+      winston.log('info', chalk.magenta.inverse('update-stream') + ' id: ' + socket.room)
+      winston.log('silly', data)
+      //console.log(chalk.magenta.inverse('update-stream') + ' id: ' + socket.room)
+      //console.log(data)
       SpkStream.findOne( {streamid: socket.room }, function(err, doc) {
-        if(!doc) return console.log(chalk.red.inverse('Error: Trying to update non-existant stream.'))
+        if(!doc) {
+          return winston.log('info', chalk.red.inverse('Error: Trying to update non-existant stream.'))
+          //return console.log(chalk.red.inverse('Error: Trying to update non-existant stream.'))
+        }
         doc.data = data
         doc.save()
-        console.log('broadcasting ')
-        // console.log( data )
+        winston.log('info', 'Socket: broadcasting to room:' + socket.room)
+        winston.log('silly', data )
+        //console.log('broadcasting ')
+        //console.log( data )
         socket.broadcast.to(socket.room).emit('update-clients', data);
         // emit to room
       } )
@@ -76,8 +104,10 @@ module.exports = function ( io ) {
 
     socket.on('delete-stream', function (data) {
       // emitter is destroyed; stream is orphaned
-      console.log(chalk.magenta.inverse('delete-stream'))
-      // console.log(data)
+      winston.log('info', chalk.magenta.inverse('Socket: delete-stream'))
+      winston.log('silly', data)
+      //console.log(chalk.magenta.inverse('delete-stream'))
+      //console.log(data)
 
       SpkStream.findOne(socket.room, function(err, doc) {
         if(!doc) return console.log("problem")
@@ -88,13 +118,16 @@ module.exports = function ( io ) {
 
     socket.on('document-closed', function (data) {
       // emitter goes offline; stream is offline
+      winston.log('debug', chalk.magenta.inverse('Socket: document closed'))
       SpkStream.findOne( {streamid: socket.room}, function (err, doc) {
         if(!doc) return
         doc.isOnline = false
         doc.save()
       })
-      console.log(chalk.magenta.inverse('document-closed'))
-      console.log(data)
+      winston.log('info', chalk.magenta.inverse('document-closed'))
+      winston.log('info', data)
+      //console.log(chalk.magenta.inverse('document-closed'))
+      //console.log(data)
     })
 
     //
@@ -102,15 +135,24 @@ module.exports = function ( io ) {
     // 
 
     socket.on('authenticate', function (data) {
-      console.log(chalk.cyan.inverse('authentication request from client'))
-      console.log(data)
+      winston.log('info', chalk.cyan.inverse('Authentication: request from client'))
+      winston.log('info', data) 
+      //console.log(chalk.cyan.inverse('authentication request from client'))
+      //console.log(data)
       User.findOne( {apitoken: data}, function(err, doc) {
-        if( err )   return socket.emit('authentication-result', {sucess: false, message:'Database fail'}) 
-        if( !doc )  return socket.emit('authentication-result', {sucess: false, message:'Invalid Api Token'})
+        if( err )   {
+          winston.log('debug', chalk.cyan.inverse('Authentication: Database fail'))
+          return socket.emit('authentication-result', {sucess: false, message:'Database fail'})
+        }
+        if( !doc )  {
+          winston.log('debug', chalk.cyan.inverse('Authentication: Invalid Api Token'))
+          return socket.emit('authentication-result', {sucess: false, message:'Invalid Api Token'})
+        }
         else {
           socket.authenticated = true
           socket.apikey = data
           socket.userid = doc._id;
+          winston.log('debug', chalk.cyan.inverse('Authentication: User logged in'))
           socket.emit('authentication-result', {sucess: true, message:'You are logged in.'})
         }
       }) 
@@ -118,12 +160,20 @@ module.exports = function ( io ) {
 
     socket.on('join-stream', function (data) {
       // emitter or client is back online
-      console.log(chalk.cyan.inverse('join stream request from client'))
-      console.log(data)
+      winston.log('info', chalk.cyan.inverse('join-stream: request from client'))
+      winston.log('info', data) 
+      //console.log(chalk.cyan.inverse('join stream request from client'))
+      //console.log(data)
       if( !socket.authenticated ) return;
       SpkStream.findOne({ streamid : data.streamid }, function (err, doc) {
-        if(err) return socket.emit('join-stream-result', {success: false, message: 'Database fail.'})
-        if(!doc) return socket.emit('join-stream-result', {success: false, message: 'No stream found.'})
+        if(err) {
+          winston.log('info','join-stream: Database fail.')
+          return socket.emit('join-stream-result', {success: false, message: 'Database fail.'})
+        }
+        if(!doc) {
+          winston.log('info','join-stream: No stream found.')
+          return socket.emit('join-stream-result', {success: false, message: 'No stream found.'})
+        }
         if(data.role === 'receiver' && socket.room!=null) {
           socket.leave(socket.room)
         }
@@ -137,6 +187,7 @@ module.exports = function ( io ) {
           doc.isOrphaned = false
           doc.save()
         }
+        winston.log('debug', 'join-stream-result', {success: true, message: 'Stream joined successfuly.', streamid : socket.room, streamname: socket.streamname})
         socket.emit('join-stream-result', {success: true, message: 'Stream joined successfuly.', streamid : socket.room, streamname: socket.streamname})
       })
     })
@@ -145,11 +196,20 @@ module.exports = function ( io ) {
     // client calls
     // 
     socket.on('pull-stream', function (data) {
-      console.log(chalk.cyan.inverse('pull stream'))
-      console.log(socket.room)
+      winston.log('info', chalk.cyan.inverse('pull stream: request from gh received'))
+      winston.log('info', socket.room)
+      //console.log(chalk.cyan.inverse('pull stream'))
+      //console.log(socket.room)
       SpkStream.findOne( { streamid: socket.room }, function(err, doc) {
-        if(err) return console.log('Database fail.')
-        if(!doc) return console.log('Stream doesn\'t exist.')
+        if(err) {
+          winston.log('debug', 'pull stream: Database fail.')
+          return winston.log('info','Database fail.')
+        }
+        if(!doc) {
+          winston.log('debug', 'pull stream: Stream doesn\'t exist.')
+          return winston.log('info','Stream doesn\'t exist.')
+        }
+        winston.log('debug', 'pull stream: updating clients')
         socket.emit('update-clients', doc.data);
       } )
     })
@@ -164,18 +224,28 @@ module.exports = function ( io ) {
     // 
 
     socket.on('frontend-request-stream', function (data) {
-      console.log(chalk.cyan.inverse('frontend-request-stream'))
-      console.log(data)
+      winston.log('info', chalk.cyan.inverse('frontend-request-stream'))
+      winston.log('debug', data)
+      //console.log(chalk.cyan.inverse('frontend-request-stream'))
+      //console.log(data)
       if(socket.room!=null) {
-        console.log('chaning rooms')
+        winston.log('info','frontend-request-stream: changing rooms to:', data.streamid)
+        //console.log('changing rooms')
         socket.leave(socket.room)
       }
       socket.room = data.streamid
       socket.join( data.streamid )
 
       SpkStream.findOne( { streamid: socket.room }, function(err, doc) {
-        if(err) return console.log('Database fail.')
-        if(!doc) return console.log('Stream doesn\'t exist.')
+        if(err) {
+          winston.log('debug', 'frontend-request-stream: Database fail.')
+          return console.log('Database fail.')
+        }
+        if(!doc) {
+          winston.log('debug', 'frontend-request-stream: Stream doesn\'t exist.')
+          return console.log('Stream doesn\'t exist.')
+        }
+        winston.log('debug', 'frontend-request-stream: updating clients')
         socket.emit('update-clients', doc.data);
       } )
 
@@ -185,7 +255,8 @@ module.exports = function ( io ) {
     // the end, my friend
     // 
     socket.on('disconnect', function () {
-      console.log( chalk.magenta.inverse('>>> connected clients: ' + --clientCount ) )
+      winston.log('info', chalk.magenta.inverse('>>> connected clients: ' + --clientCount ) )
+      //console.log( chalk.magenta.inverse('>>> connected clients: ' + --clientCount ) )
     })
   })
 }
