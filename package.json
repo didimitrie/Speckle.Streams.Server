@@ -1,0 +1,28 @@
+{
+  "name": "speckle.streams.server",
+  "version": "0.0.1",
+  "description": "speckle streams backend server api",
+  "main": "server.js",
+  "scripts": {},
+  "author": "Dimitrie A. Stefanescu / UCL The Bartlett School of Architecture / InnoChain",
+  "license": "GPL-3.0",
+  "dependencies": {
+    "bcrypt-nodejs": "0.0.3",
+    "body-parser": "^1.15.1",
+    "chalk": "^1.1.3",
+    "compression": "^1.6.1",
+    "cookie-parser": "^1.4.1",
+    "cors": "^2.7.1",
+    "dateformat": "^1.0.12",
+    "express": "^4.13.4",
+    "jsonwebtoken": "^7.0.1",
+    "mongoose": "^4.4.14",
+    "morgan": "^1.7.0",
+    "node-uuid": "^1.4.7",
+    "passport": "^0.3.2",
+    "passport-jwt": "^2.0.0",
+    "shortid": "^2.2.6",
+    "socket.io": "^0.9.17",
+    "underscore": "^1.8.3"
+  }
+}
