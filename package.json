@@ -23,6 +23,7 @@
     "passport-jwt": "^2.0.0",
     "shortid": "^2.2.6",
     "socket.io": "^0.9.17",
-    "underscore": "^1.8.3"
+    "underscore": "^1.8.3",
+    "winston": "^2.2.0"
   }
 }
