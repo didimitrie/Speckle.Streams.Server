@@ -51,7 +51,7 @@ module.exports = function( app, express ) {
               username : user.local.username,
               lastlogin: dateFormat( user.logins[user.logins.length-1].date)
             }
-            var token = jwt.sign( profile, SessionSecret, { expiresIn: 86400 } )
+            var token = jwt.sign( profile, SessionSecret, { expiresIn: '48h' } )
             res.json( {success: true, token: 'JWT ' + token, profile: profile } )                 
           }
         })
