@@ -1,6 +1,7 @@
-var mongoose    = require('mongoose')
-var bcrypt      = require('bcrypt-nodejs')
-var uuid        = require('node-uuid')
+var mongoose          = require('mongoose')
+var bcrypt            = require('bcrypt-nodejs')
+var uuid              = require('node-uuid')
+var winston           = require('winston')
 
 var userSchema = mongoose.Schema( {
   local: {
@@ -34,13 +35,12 @@ userSchema.pre( 'save', function (next) {
 userSchema.methods.generateHash = function (password) {
   return bcrypt.hashSync( password, bcrypt.genSaltSync(8), null );
 }
-userSchema.methods.validPassword = function (pw, cb) {
-  bcrypt.compare(pw, this.password, function(err, isMatch) {
-      if (err) {
-        return cb(err)
-      }
-      cb(null, isMatch)
-    })
+
+userSchema.methods.validPassword = function ( pw, cb ) {
+  bcrypt.compare( pw, this.local.password, function( err, res ) {
+    if(res === true) return cb(true)
+    else return cb(false)
+  })
 }
 
 module.exports = mongoose.model('User', userSchema)

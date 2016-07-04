@@ -19,8 +19,8 @@ module.exports = function ( io ) {
   var clientCount = 0;
 
   // LOL
-  var adjectives = ["Liquid", "Swirly", "Tumultous", "Clamourous", "Deafening", "Thunderous", "Damp", "Flowing", "Moist", "Solvent"]
-  var names = ["Waterway", "Stream", "Brook", "Torrent", "Current", "Cascade", "Surge", "River", "Deluge", "Canal"]
+  var adjectives = ["Liquid", "Swirly", "Tumultous", "Clamourous", "Deafening", "Thunderous", "Damp", "Flowing", "Moist", "Solvent", "Gushing", "Soaking", "Penile"]
+  var names = ["Waterway", "Stream", "Brook", "Torrent", "Current", "Cascade", "Surge", "River", "Deluge", "Canal", "Wash", "Outburst"]
 
   io.on('connection', function (socket) {
     winston.log('info', chalk.magenta.inverse('>>> connected clients: ' + ++clientCount ))
