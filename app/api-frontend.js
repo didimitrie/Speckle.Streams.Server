@@ -21,6 +21,7 @@ module.exports = function( app, express ) {
         streams.push( {
           name : docs[i].name,
           createdon : df(new Date(docs[i].createdon), 'HH:MM d / m / yyyy'),
+          date: docs[i].createdon,
           isOnline : docs[i].isOnline,
           isOrphaned: docs[i].isOrphaned,
           streamid : docs[i].streamid,
