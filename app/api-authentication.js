@@ -4,6 +4,7 @@ var jwt               = require('jsonwebtoken')
 var SessionSecret     = require('../.secrets/session.secret')
 
 var dateFormat        = require('dateformat')
+var winston           = require('winston')
 
 module.exports = function( app, express ) {
 
@@ -35,8 +36,12 @@ module.exports = function( app, express ) {
       if( !user ) res.json( { success: false, message: 'No account with this email exists.'} )
       else {
         user.validPassword( req.body.password, function( isMatch ) {
-          if( !isMatch ) res.json( { success: false, message: 'Wrong password.'} )
+          if( !isMatch ) {
+            winston.log('info', 'wrong password')
+            res.json( { success: false, message: 'Wrong password.'} )
+          }
           else{
+            winston.log('info', 'login ok')
             user.logins.push( { date: Date.now() } )
             user.save()
             
@@ -46,7 +51,7 @@ module.exports = function( app, express ) {
               username : user.local.username,
               lastlogin: dateFormat( user.logins[user.logins.length-1].date)
             }
-            var token = jwt.sign( profile, SessionSecret, { expiresIn: 86400 } )
+            var token = jwt.sign( profile, SessionSecret, { expiresIn: '48h' } )
             res.json( {success: true, token: 'JWT ' + token, profile: profile } )                 
           }
         })
