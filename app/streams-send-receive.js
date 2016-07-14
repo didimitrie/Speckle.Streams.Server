@@ -137,8 +137,8 @@ module.exports = function ( io ) {
     socket.on('authenticate', function (data) {
       winston.log('info', chalk.cyan.inverse('Authentication: request from client'))
       winston.log('info', data) 
-      //console.log(chalk.cyan.inverse('authentication request from client'))
-      //console.log(data)
+
+      data = data.replace(/\n$/, "")
       User.findOne( {apitoken: data}, function(err, doc) {
         if( err )   {
           winston.log('debug', chalk.cyan.inverse('Authentication: Database fail'))

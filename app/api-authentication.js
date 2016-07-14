@@ -59,5 +59,17 @@ module.exports = function( app, express ) {
     })
   })
 
+  apiRoutes.post('/keycheck', function(req, res) {
+    if(req.body.apikey == null ) {
+      console.log('no key found in request body. aborting.')
+      return res.end()
+    } else {
+      User.findOne( { apitoken: req.body.apikey }, function(err, user) {
+        if( err ) return res.send('error')
+        if( user == null ) return res.send('error')
+        return res.send('ok,' + user.local.username)
+      })
+    }
+  })
   app.use('/auth', apiRoutes)
 }
