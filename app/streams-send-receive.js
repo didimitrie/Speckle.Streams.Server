@@ -19,7 +19,7 @@ module.exports = function ( io ) {
   var clientCount = 0;
 
   // LOL
-  var adjectives = ["Liquid", "Swirly", "Tumultous", "Clamourous", "Deafening", "Thunderous", "Damp", "Flowing", "Moist", "Solvent", "Gushing", "Soaking", "Penile"]
+  var adjectives = ["Liquid", "Swirly", "Tumultous", "Clamourous", "Deafening", "Thunderous", "Damp", "Flowing", "Moist", "Solvent", "Gushing", "Soaking"]
   var names = ["Waterway", "Stream", "Brook", "Torrent", "Current", "Cascade", "Surge", "River", "Deluge", "Canal", "Wash", "Outburst"]
 
   io.on('connection', function (socket) {
@@ -224,11 +224,12 @@ module.exports = function ( io ) {
     // 
 
     socket.on('frontend-request-stream', function (data) {
-      winston.log('info', chalk.cyan.inverse('frontend-request-stream'))
+      winston.log('info', chalk.cyan.inverse('frontend-request-stream from ' + socket.id))
       winston.log('debug', data)
-      //console.log(chalk.cyan.inverse('frontend-request-stream'))
-      //console.log(data)
-      if(socket.room!=null) {
+
+
+
+      if(socket.room !=null ) {
         winston.log('info','frontend-request-stream: changing rooms to:', data.streamid)
         //console.log('changing rooms')
         socket.leave(socket.room)
