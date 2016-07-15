@@ -6,7 +6,7 @@ var streamSchema = mongoose.Schema( {
   name: { type: String, default: 'Anonymous Stream'},
   createdon: {type: Date, default: Date.now() },
   lastEmit: {type: Date},
-  lastReceive: {type: Date},
+  lastDirectRequest: {type: Date},
   data: { type: Object },
   cachedData: { type: Array, default: [] },
   structure: { type: Array, default: [] }, 
