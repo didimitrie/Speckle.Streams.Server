@@ -102,6 +102,24 @@ module.exports = function ( io ) {
       } )
     })
 
+    socket.on('update-sliders', function (data) {
+      // emitter sends new data; 
+      winston.log('info', chalk.magenta.inverse('update-sliders') + ' id: ' + socket.room)
+      winston.log('silly', data)
+
+      SpkStream.findOne( {streamid: socket.room }, function(err, doc) {
+        if(!doc) {
+          return winston.log('info', chalk.red.inverse('Error: Trying to update non-existant stream.'))
+        }
+        doc.data = data
+        doc.save()
+        winston.log('info', 'Socket: broadcasting sliders to room:' + socket.room)
+        winston.log('silly', data )
+        socket.broadcast.to(socket.room).emit('update-sliders', data);
+        // emit to room
+      } )
+    })
+
     socket.on('delete-stream', function (data) {
       // emitter is destroyed; stream is orphaned
       winston.log('info', chalk.magenta.inverse('Socket: delete-stream'))
