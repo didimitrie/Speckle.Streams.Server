@@ -12,7 +12,7 @@ var mongoose        = require('./.config/database')
 var passport        = require('passport')
 
 var path            = require('path')
-global.APPROOT      = path.resolve(__dirname)
+global.APPROOT      = path.resolve(__dirname) // am i using this?
 
 //LOGGING
 var winston         = require('winston');

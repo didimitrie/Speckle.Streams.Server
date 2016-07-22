@@ -1,5 +1,6 @@
 var User              = require('../models/user')
 var SpkStream         = require('../models/stream')
+var SpkDroplet        = require('../models/droplet')
 
 var passport        = require('passport')
 var df              = require('dateformat')
@@ -20,20 +21,20 @@ module.exports = function( app, express ) {
         return res.json({success: false, message:"Database fail."})
       if(docs.length === 0) 
         return res.json({success: true, message: "User has no streams."})
-      var streams = []
-      for (var i = docs.length - 1; i >= 0; i--) {
-        streams.push( {
-          name : docs[i].name,
-          createdon : df(new Date(docs[i].createdon), 'HH:MM d / m / yyyy'),
-          date: docs[i].createdon,
-          isOnline : docs[i].isOnline,
-          isOrphaned: docs[i].isOrphaned,
-          streamid : docs[i].streamid,
-        } )
-      }
-      res.json( {success: true, streams: streams} )  
+      return res.json( {success: true, streams: docs} )  
     })
-    
+  })
+
+  frontEndRoutes.get('/droplet', function(req, res) {
+    winston.log('info', chalk.magenta.inverse('droplet id request ') + req.query.dropletid)
+    if( !req.query.dropletid ) return winston.log('error', 'no droplet id specified')
+    SpkDroplet.findById( req.query.dropletid , function(err, droplet) {
+      if(err)
+        return res.json({success: false, message: 'Database fail'})
+      if(!droplet)
+        return res.json({success: false, message: 'No droplet with that id found'})
+      return res.json({success: true, message: 'Droplet found', droplet: droplet})
+    })
   })
 
   app.use('/api/frontend', frontEndRoutes)

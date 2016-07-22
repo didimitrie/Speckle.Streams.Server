@@ -1,6 +1,7 @@
 // streams-send-receive
 var User              = require('../models/user')
 var SpkStream         = require('../models/stream')
+var SpkDroplet        = require('../models/droplet')
 var chalk             = require('chalk')
 var shortId           = require('shortid')
 //LOGGING
@@ -79,18 +80,33 @@ module.exports = function ( io ) {
     socket.on('update-stream', function (data) {
       // emitter sends new data; 
       winston.log('info', chalk.magenta.inverse('update-stream') + ' id: ' + socket.room)
-      winston.log('silly', data)
       SpkStream.findOne( {streamid: socket.room }, function(err, doc) {
         if(!doc) {
           return winston.log('info', chalk.red.inverse('Error: Trying to update non-existant stream.'))
-          //return console.log(chalk.red.inverse('Error: Trying to update non-existant stream.'))
         }
-        doc.data = data
-        doc.lastEmit = Date.now()
-        doc.save()
-        winston.log('info', 'Socket: broadcasting to room:' + socket.room)
-        winston.log('silly', data )
 
+        // if no data drops, then create one (it's new!)
+        if(doc.droplets.length === 0) {
+          var droplet = new SpkDroplet({
+            parentStream: doc._id,
+            data: data
+          })
+          doc.droplets.push( { droplet: droplet._id, date: Date.now() } )
+          droplet.save()          
+        } 
+        // this is not a save stream, so last droplet (CURRENT DATA) gets updated
+        else {
+          SpkDroplet.findById( doc.droplets[ doc.droplets.length - 1 ].droplet, function(err, droplet) {
+            // TODO ERROR CHECKING
+            droplet.data = data
+            droplet.date = Date.now()
+            droplet.save()
+          } )
+        }
+
+        doc.save()
+
+        winston.log('info', 'Socket: broadcasting to room:' + socket.room)
         socket.broadcast.to(socket.room).emit('update-clients', data);
       } )
     })
@@ -100,27 +116,30 @@ module.exports = function ( io ) {
       // emitter sends new data; 
       // save to cache as well
       winston.log('info', chalk.magenta.inverse('update-save-stream') + ' id: ' + socket.room)
-      winston.log('silly', data)
       SpkStream.findOne( {streamid: socket.room }, function(err, doc) {
         if(!doc) {
           return winston.log('info', chalk.red.inverse('Error: Trying to update non-existant stream.'))
         }
-        doc.cachedData.push({ timestamp: Date.now(), data: data })
-        doc.data = data
-        doc.lastEmit = Date.now()
+        
+        var droplet = new SpkDroplet({
+          parentStream: doc._id,
+          data: data
+        })
+        doc.droplets.push( { droplet: droplet._id, date: Date.now() } )       
+        
+        droplet.save()
         doc.save()
+        
         winston.log('info', 'Socket: broadcasting to room:' + socket.room)
-        winston.log('silly', data )
 
-        socket.broadcast.to(socket.room).emit('update-clients', data);
+        socket.broadcast.to(socket.room).emit('update-clients', data)
+        socket.broadcast.to(socket.room).emit('frontend-update-cachedlist', {date: droplet.date, droplet: droplet._id})
       } )
     })
 
     socket.on('delete-stream', function (data) {
       // emitter is destroyed; stream is orphaned
       winston.log('info', chalk.magenta.inverse('Socket: delete-stream'))
-      winston.log('silly', data)
-      //console.log(chalk.magenta.inverse('delete-stream'))
 
       SpkStream.findOne( {streamid: socket.room}, function(err, doc) {
         if(!doc) return console.log("problem")
@@ -210,19 +229,27 @@ module.exports = function ( io ) {
     socket.on('pull-stream', function (data) {
       winston.log('info', chalk.cyan.inverse('pull stream: request from gh received'))
       winston.log('info', socket.room)
+      
       SpkStream.findOne( { streamid: socket.room }, function(err, doc) {
-        if(err) {
-          winston.log('debug', 'pull stream: Database fail.')
+        if(err)
           return winston.log('info','Database fail.')
-        }
-        if(!doc) {
-          winston.log('debug', 'pull stream: Stream doesn\'t exist.')
+        if(!doc) 
           return winston.log('info','Stream doesn\'t exist.')
-        }
+
+        if(doc.droplets.length <= 0) 
+          return winston.log('debug', 'stream has no emitted data')
+
+        SpkDroplet.findById( doc.droplets[ doc.droplets.length - 1 ].droplet, function(err, droplet) {
+          if(err)
+            return winston.log('info','Database fail.')
+          if(!droplet) 
+            return winston.log('info','Droplet not found.')
+          socket.emit( 'update-clients', droplet.data );
+        } )
+
         doc.lastDirectRequest = Date.now()
         doc.save()
         winston.log('debug', 'pull stream: updating clients')
-        socket.emit('update-clients', doc.data);
       } )
     })
 
@@ -238,8 +265,6 @@ module.exports = function ( io ) {
     socket.on('frontend-request-stream', function (data) {
       winston.log('info', chalk.cyan.inverse('frontend-request-stream from ' + socket.id))
       winston.log('debug', data)
-
-
 
       if(socket.room !=null ) {
         winston.log('info','frontend-request-stream: changing rooms to:', data.streamid)
@@ -259,7 +284,11 @@ module.exports = function ( io ) {
           return console.log('Stream doesn\'t exist.')
         }
         winston.log('debug', 'frontend-request-stream: updating clients')
-        socket.emit('update-clients', doc.data);
+
+        SpkDroplet.findById(doc.droplets[doc.droplets.length-1].droplet, function(err, droplet) {
+          socket.emit('update-clients', droplet.data);
+        })
+        
       } )
 
     } )
