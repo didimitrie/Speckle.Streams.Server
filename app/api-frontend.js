@@ -1,6 +1,7 @@
 var User              = require('../models/user')
 var SpkStream         = require('../models/stream')
 var SpkDroplet        = require('../models/droplet')
+var SpkMolecule       = require('../models/molecule')
 
 var passport        = require('passport')
 var df              = require('dateformat')
@@ -34,6 +35,19 @@ module.exports = function( app, express ) {
       if(!droplet)
         return res.json({success: false, message: 'No droplet with that id found'})
       return res.json({success: true, message: 'Droplet found', droplet: droplet})
+    })
+  })
+
+  frontEndRoutes.get('/molecule', function(req, res) {
+    winston.log('info', chalk.magenta.inverse('molecule request ') + req.query.hash )
+    if(!req.query.hash) return winston.log('error', 'no hash specfied')
+
+    SpkMolecule.findOne({hash: req.query.hash}, function(err, molecule) {
+      if(err)
+        return res.json({success: false, message: 'Database fail'})
+      if(!molecule)
+        return res.json({success: false, message: 'No molecule with that hash found'})
+      return res.json({success: true, message: 'Molecule found', molecule: molecule})
     })
   })
 

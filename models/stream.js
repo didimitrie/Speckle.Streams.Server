@@ -7,7 +7,6 @@ var streamSchema = mongoose.Schema( {
   createdon: {type: Date, default: Date.now() },
   lastEmit: {type: Date},
   lastDirectRequest: {type: Date},
-  livedroplet: {type: String },
   droplets: { type: Array, default: [] },
   structure: { type: Array, default: [] }, 
   isOnline: { type: Boolean, default: true},

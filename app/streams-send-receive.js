@@ -2,6 +2,8 @@
 var User              = require('../models/user')
 var SpkStream         = require('../models/stream')
 var SpkDroplet        = require('../models/droplet')
+var SpkMolecule       = require('../models/molecule')
+
 var chalk             = require('chalk')
 var shortId           = require('shortid')
 //LOGGING
@@ -61,6 +63,7 @@ module.exports = function ( io ) {
 
       SpkStream.findOne( {streamid: socket.room }, function(err, doc) {
         doc.structure = data.structure;
+        console.log(data.structure)
         doc.save()
       })
 
@@ -78,33 +81,48 @@ module.exports = function ( io ) {
     })
 
     socket.on('update-stream', function (data) {
-      // emitter sends new data; 
+      // emitter sends new data and we emit it out right away 
       winston.log('info', chalk.magenta.inverse('update-stream') + ' id: ' + socket.room)
+      // look for a stream
       SpkStream.findOne( {streamid: socket.room }, function(err, doc) {
         if(!doc) {
           return winston.log('info', chalk.red.inverse('Error: Trying to update non-existant stream.'))
         }
-
-        // if no data drops, then create one (it's new!)
-        if(doc.droplets.length === 0) {
-          var droplet = new SpkDroplet({
-            parentStream: doc._id,
-            data: data
-          })
-          doc.droplets.push( { droplet: droplet._id, date: Date.now() } )
-          droplet.save()          
-        } 
-        // this is not a save stream, so last droplet (CURRENT DATA) gets updated
-        else {
-          SpkDroplet.findById( doc.droplets[ doc.droplets.length - 1 ].droplet, function(err, droplet) {
-            // TODO ERROR CHECKING
-            droplet.data = data
+        // if the stream has a live droplet then update that
+        if(doc.livedroplet != '') {
+          SpkDroplet.findById( doc.livedroplet, function(err, droplet) {
+            if(err) return winston.log('info', 'Database fail')
+            if(!droplet) return winston.log('info', 'Error: Did not find live droplet for stream')
+            winston.log('info', 'found live droplet, updating')
+            droplet.structure = data.structure
+            // droplet.data = data // this will no longer be needed, kept for compatibility reasons
             droplet.date = Date.now()
             droplet.save()
+          })
+        }
+        // otherwise create a new live droplet for the stream
+        else {
+          winston.log('info', 'no live droplet exists, creating one' )
+          var droplet = new SpkDroplet( {
+            parentStream: doc._id,
+            structure: data.structure,
+            // data: data // this will no longer be needed, kept for compatibility reasons
           } )
+          doc.livedroplet = droplet._id
+          doc.save()
+          droplet.save() 
         }
 
-        doc.save()
+        // Save all objects in database. The pre.save hook in the molecule
+        // ensure that only molecules with a unique hash are saved.       
+        for (var i = 0; i < data.objects.length; i++) {
+          var myObj = data.objects[i]
+          var molecule = new SpkMolecule({
+            hash: myObj.hash,
+            data: myObj
+          })
+          molecule.save()
+        }
 
         winston.log('info', 'Socket: broadcasting to room:' + socket.room)
         socket.broadcast.to(socket.room).emit('update-clients', data);
@@ -113,8 +131,8 @@ module.exports = function ( io ) {
 
 
     socket.on('update-save-stream', function (data) {
-      // emitter sends new data; 
-      // save to cache as well
+      // emitter wants to save an instance of his current stream
+      // does not broadcast to the live stream 
       winston.log('info', chalk.magenta.inverse('update-save-stream') + ' id: ' + socket.room)
       SpkStream.findOne( {streamid: socket.room }, function(err, doc) {
         if(!doc) {
@@ -123,17 +141,25 @@ module.exports = function ( io ) {
         
         var droplet = new SpkDroplet({
           parentStream: doc._id,
-          data: data
+          structure: data.structure,
+          // data: data // this will no longer be needed, kept for compatibility reasons
         })
+
+        // Save all objects in database. The pre.save hook in the molecule
+        // ensure that only molecules with a unique hash are saved.       
+        for (var i = 0; i < data.objects.length; i++) {
+          var myObj = data.objects[i]
+          var molecule = new SpkMolecule({
+            hash: myObj.hash,
+            data: myObj
+          })
+          molecule.save()
+        }
+
         doc.droplets.push( { droplet: droplet._id, date: Date.now() } )       
         
         droplet.save()
         doc.save()
-        
-        winston.log('info', 'Socket: broadcasting to room:' + socket.room)
-
-        socket.broadcast.to(socket.room).emit('update-clients', data)
-        socket.broadcast.to(socket.room).emit('frontend-update-cachedlist', {date: droplet.date, droplet: droplet._id})
       } )
     })
 
@@ -236,15 +262,31 @@ module.exports = function ( io ) {
         if(!doc) 
           return winston.log('info','Stream doesn\'t exist.')
 
-        if(doc.droplets.length <= 0) 
-          return winston.log('debug', 'stream has no emitted data')
-
-        SpkDroplet.findById( doc.droplets[ doc.droplets.length - 1 ].droplet, function(err, droplet) {
+        SpkDroplet.findById( doc.livedroplet, function(err, droplet) {
           if(err)
             return winston.log('info','Database fail.')
           if(!droplet) 
             return winston.log('info','Droplet not found.')
-          socket.emit( 'update-clients', droplet.data );
+
+          var objects = []
+          for (var i = 0; i < droplet.structure.length; i++) {
+            var item = droplet.structure[i]
+            for(var j = 0; j < item.objects.length; j++) {
+              objects.push(item.objects[j])
+            }
+          }
+
+          // possibly bad, loads in memory possibly big amounts of data
+          // should probably switch to file storage for the data (...)
+          SpkMolecule.find({ hash: {$in: objects} }, function(error, molecules) {
+            var payload = { objects:[], stream:{} } 
+            for(var i = 0; i < molecules.length; i++) {
+              payload.objects.push(molecules[i].data)
+            }
+            payload.structure = droplet.structure
+            // finally emit the data -> YO
+            socket.emit( 'update-clients', payload );
+          })
         } )
 
         doc.lastDirectRequest = Date.now()
@@ -262,11 +304,10 @@ module.exports = function ( io ) {
     // frontend calls
     // 
 
-    socket.on('frontend-request-stream', function (data) {
+    socket.on('frontend-pull-stream', function (data) {
       winston.log('info', chalk.cyan.inverse('frontend-request-stream from ' + socket.id))
-      winston.log('debug', data)
 
-      if(socket.room !=null ) {
+      if(socket.room != null ) {
         winston.log('info','frontend-request-stream: changing rooms to:', data.streamid)
         //console.log('changing rooms')
         socket.leave(socket.room)
@@ -275,20 +316,41 @@ module.exports = function ( io ) {
       socket.join( data.streamid )
 
       SpkStream.findOne( { streamid: socket.room }, function(err, doc) {
-        if(err) {
-          winston.log('debug', 'frontend-request-stream: Database fail.')
-          return console.log('Database fail.')
-        }
-        if(!doc) {
-          winston.log('debug', 'frontend-request-stream: Stream doesn\'t exist.')
-          return console.log('Stream doesn\'t exist.')
-        }
-        winston.log('debug', 'frontend-request-stream: updating clients')
+        if(err)
+          return winston.log('info','Database fail.')
+        if(!doc) 
+          return winston.log('info','Stream doesn\'t exist.')
 
-        SpkDroplet.findById(doc.droplets[doc.droplets.length-1].droplet, function(err, droplet) {
-          socket.emit('update-clients', droplet.data);
-        })
-        
+        SpkDroplet.findById( doc.livedroplet, function(err, droplet) {
+          if(err)
+            return winston.log('info','Database fail.')
+          if(!droplet) 
+            return winston.log('info','Droplet not found.')
+
+          var objects = []
+          for (var i = 0; i < droplet.structure.length; i++) {
+            var item = droplet.structure[i]
+            for(var j = 0; j < item.objects.length; j++) {
+              objects.push(item.objects[j])
+            }
+          }
+
+          // possibly bad, loads in memory possibly big amounts of data
+          // should probably switch to file storage for the data (...)
+          SpkMolecule.find({ hash: {$in: objects} }, function(error, molecules) {
+            var payload = { objects:[], stream:{} } 
+            for(var i = 0; i < molecules.length; i++) {
+              payload.objects.push(molecules[i].data)
+            }
+            payload.structure = droplet.structure
+            // finally emit the data -> YO
+            socket.emit( 'update-clients', payload );
+          })
+        } )
+
+        doc.lastDirectRequest = Date.now()
+        doc.save()
+        winston.log('debug', 'pull stream: updating clients')
       } )
 
     } )

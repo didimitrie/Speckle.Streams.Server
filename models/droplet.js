@@ -3,7 +3,7 @@ var mongoose    = require('mongoose')
 var dropletSchema = mongoose.Schema( {
   date: { type: Date, default: Date.now(), index: true } ,
   parentStream: { type: String },
-  data: { type: Object },
+  structure: {type: Array, default: [] },
   requesthash : { type: String, default: '-1'} // will be held towards 
 } )
 
